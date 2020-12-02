@@ -1,0 +1,37 @@
+package com.jfai.afs.ratelimiter.actuator;
+
+import com.jfai.afs.ratelimiter.core.DRateLimiter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.endpoint.web.annotation.RestControllerEndpoint;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+
+/**
+ * @author Nisus Liu
+ * @version 0.0.1
+ * @email liuhejun108@163.com
+ * @date 2019/5/10 9:52
+ */
+@RestControllerEndpoint(id = "dratelimiter")
+public class OnOffEndpoint {
+    @Autowired
+    private DRateLimiter dRateLimiter;
+
+    @GetMapping()
+    public String isOff() {
+        return "off=" + dRateLimiter.isOff();
+    }
+
+    @PostMapping("/{onOff}")
+    public String setOff(@PathVariable("onOff") String onOff) {
+        if ("on".equalsIgnoreCase(onOff)) {
+            dRateLimiter.setOff(false);
+        } else if ("off".equalsIgnoreCase(onOff)) {
+            dRateLimiter.setOff(true);
+        }else{
+            return "不支持的操作符: " + onOff;
+        }
+        return onOff;
+    }
+}

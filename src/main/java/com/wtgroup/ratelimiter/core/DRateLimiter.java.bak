@@ -1,0 +1,151 @@
+package com.jfai.afs.ratelimiter.core;
+
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.time.Duration;
+import java.util.Arrays;
+
+/**
+ * 基于 Redis 的分布式限流器
+ *
+ * @author Nisus Liu
+ * @version 0.0.1
+ * @email liuhejun108@163.com
+ * @date 2019/4/22 16:02
+ */
+public class DRateLimiter {
+
+    // protected static final Logger log = LoggerFactory.getLogger(DRateLimiter.class);
+
+    /**
+     * 缺省使用的 key
+     */
+    private static final String DEFAULT_KEY = "LUA_REDIS_RATE_LIMIT_KEY";
+
+
+    private static final String luaScript;
+
+    static {
+        String luaScript1;
+        InputStream in = DRateLimiter.class.getResourceAsStream("/ratelimit.lua");
+        // File rateLimitLua = new File("ratelimit.lua");
+        if (in == null) {
+            throw new RuntimeException("ratelimit.lua not found!");
+        }
+        // FileInputStream in = new FileInputStream(rateLimitLua);
+        ByteArrayOutputStream cnt = new ByteArrayOutputStream(4096);
+        byte[] buff = new byte[4096];
+        int i = -1;
+        try {
+            while ((i = in.read(buff)) > 0) {
+                cnt.write(buff, 0, i);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            luaScript1 = cnt.toString("UTF-8");
+            // log.debug("lua script for ratelimit: {}", luaScript1);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+
+        luaScript = luaScript1;
+    }
+
+    //private final Jedis jedis;
+    private final JedisPool jedisPool;
+    //    private final long defaultLimit;
+//    private final Duration defaultWindow;
+    private boolean off = false;
+
+    public boolean isOff() {
+        return off;
+    }
+
+    public void setOff(boolean off) {
+        this.off = off;
+    }
+
+    public DRateLimiter(JedisPool jedisPool) {
+//        assert limit >= 0 : "limit >= 0";
+//        this.defaultLimit = defaultLimit;
+//        this.defaultWindow = defaultWindow;
+
+        if (jedisPool == null) {
+            //this.jedis = new Jedis("127.0.0.1", 6379);
+            this.jedisPool = new JedisPool();
+        } else {
+            this.jedisPool = jedisPool;
+        }
+    }
+
+//    public boolean acquire() throws Exception {
+//        return acquire(DEFAULT_KEY, limit, Duration.ofSeconds(1));
+//    }
+
+    /**
+     * @param key
+     * @param limit  上限
+     * @param window 时间窗口长度
+     * @return
+     */
+    public boolean acquire(String key, long limit, Duration window) {
+        /*
+         * 时间窗口 为 S 时, 将时间戳规整为 S;
+         * 分钟时, 规整为 min
+         * */
+
+        Object eval = null;
+        try (Jedis jedis = jedisPool.getResource()) {
+            long windMs = window.toMillis();
+            long l = System.currentTimeMillis() / windMs;
+            String innerKey = key + ":" + l;
+            String innerLimit = String.valueOf(limit);
+            // 加入ttl, 脚本中并不知晓时间窗口的大小
+            // ttl
+            long windSec = windMs / 1000;
+            String ttl = String.valueOf(calcTtl(windSec));
+
+            eval = jedis.eval(luaScript,
+                    Arrays.asList(innerKey),
+                    Arrays.asList(innerLimit, ttl));
+        }
+
+        if (eval == null) {
+            throw new RuntimeException("redis lua srcript return null, rete limit fail");
+        }
+
+        return (Long) eval == 1;
+    }
+
+    /**
+     * 为了保证 TTL 略长于计数窗口
+     * <p>
+     * 时间窗口在 10S 内, ttl 设为计数窗口的两倍;
+     * > 10S, ttl 增加 10S;
+     * 不足 1S 按 1S
+     *
+     * @param windSec 秒数
+     * @return
+     */
+    private long calcTtl(long windSec) {
+        if (windSec < 1) {
+            return 1;
+        }
+
+        int threshold = 10;
+        if (windSec <= threshold) {
+            return windSec << 1;
+        }
+
+        return windSec + threshold;
+    }
+
+}
