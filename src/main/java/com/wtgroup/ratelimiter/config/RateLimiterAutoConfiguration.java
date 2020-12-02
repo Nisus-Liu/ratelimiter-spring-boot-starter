@@ -1,6 +1,5 @@
-package com.jfai.afs.ratelimiter.config;
+package com.wtgroup.ratelimiter.config;
 
-import com.wtgroup.ratelimiter.config.RateLimiterProperties;
 import com.wtgroup.ratelimiter.core.FixWindowRateLimiter;
 import com.wtgroup.ratelimiter.core.SmoothBurstyRateLimiter;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;

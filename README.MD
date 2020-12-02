@@ -3,7 +3,7 @@
 Spring boot 启动器.
 
 默认提供好了默认配置的 `FixWindowRateLimiter` 和 `SmoothBurstyRateLimiter` 实例.
-`@Autowire` 注入后即可使用.:wq
+`@Autowire` 注入后即可使用.
 
 ## `FixWindowRateLimiter` 固定窗口计数限流
 

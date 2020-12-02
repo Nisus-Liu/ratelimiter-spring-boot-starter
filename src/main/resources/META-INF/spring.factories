@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  com.jfai.afs.ratelimiter.config.RateLimiterAutoConfiguration
+  com.wtgroup.ratelimiter.config.RateLimiterAutoConfiguration
